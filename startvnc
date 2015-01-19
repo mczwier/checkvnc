@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+
+import re, os, socket, getpass, subprocess, argparse
+
+parser = argparse.ArgumentParser(description='''\
+Start a VNC remote display in the background and print information on how to
+connect to it and/or shut it down.
+''')
+parser.add_argument('-a', '--auto', action='store_const', dest='verbosity', const='auto',
+                    help='''Print server information in a format easily parsed by other tools (for automation
+                    purposes''')
+parser.add_argument('-t', '--test', action='store_const', const=True, default=False,
+                    help='Do not actually start a server; use some canned vncserver output instead.')
+parser.set_defaults(verbosity=None)
+args = parser.parse_args()
+
+
+# Ensure that a valid session is chosen
+if 'XSESSION' not in os.environ:
+    os.environ['XSESSION'] = 'KDE-4'
+
+
+# Run vncserver, or else use some example output for test purposes
+if not args.test:
+    output = subprocess.check_output('vncserver -geometry 1024x768 -depth 24 -SecurityTypes None -localhost'.split(),
+                                     stderr=subprocess.STDOUT)
+else:
+    output = '''\
+
+New 'gibbs:1 (mzwier)' desktop is gibbs:1
+
+Starting applications specified in /home/mzwier/.vnc/xstartup
+Log file is /home/mzwier/.vnc/gibbs:1.log
+
+'''
+
+
+# Parse the output
+re_display = re.compile(r'desktop is \w*:([0-9]+)')
+ndisplay = int(re_display.search(str(output)).group(1))
+port = ndisplay + 5900
+
+# Print out helpful end-user information
+username = getpass.getuser()
+hostname = 'gibbs.drake.edu' #socket.getfqdn()
+
+
+if args.verbosity == 'auto':
+    instructions = '''\
+hostname={hostname}
+display={ndisplay:d}
+port={port:d}'''.format(**locals())
+    
+else:
+    instructions = '''\
+Remote display :{ndisplay:d} is now running on port {port:d}.
+
+To make this display available, first run
+
+  ssh -L {port:d}:localhost:{port:d} {username}@{hostname}
+
+*on your local machine* (not on {hostname}), then use your favorite
+VNC client to connect to {hostname}:{port:d}. On Linux, this usually
+looks like
+
+  vncviewer localhost:{port:d}
+
+which again must be run *on your local machine*, not in an SSH
+session.  On OS X or Windows, enter
+
+  {hostname}:{port:d}
+
+as the host to which to connect.
+
+This display will remain running even if you disconnect or you lose
+your network connection. To reconnect, be sure an SSH session is
+running (including the -L flag above), then reconnect with the VNC
+viewer.
+
+To shut the display down, run
+
+  vncserver -kill :{ndisplay:d}
+
+in a SSH session on {hostname} (not your local machine).
+'''.format(**locals())
+
+print(instructions)
+
