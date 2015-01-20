@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+
+import re, os, sys, socket, getpass, subprocess, argparse
+
+# === Defaults
+# The port corresponding to VNC display :0
+baseport = 5900
+
+# The current hostname, patched to be fully-qualified
+hostname = socket.gethostname()
+if '.' not in hostname: hostname += '.drake.edu'
+
+# The default X session
+default_session = 'KDE-4'
+
+
+# === Regular expressions for dealing with the vncserver program
+re_server_entry = re.compile(r'^\s*:(?P<display>\d+)\s+(?P<pid>\d+)')
+re_get_display = re.compile(r'desktop is \w*:([0-9]+)')
+
+# === Test output
+test_server_output = '''\
+
+New 'gibbs:1 (mzwier)' desktop is gibbs:1
+
+Starting applications specified in /home/mzwier/.vnc/xstartup
+Log file is /home/mzwier/.vnc/gibbs:1.log
+
+'''
+
+def display_to_port(display):
+    return int(display) + baseport
+
+def get_server_list():
+    '''Call ``vncserver -list`` to obtain the list of running VNC servers
+    for this user. Return a list of server information
+    dictionaries.
+
+    '''
+    
+    process = subprocess.Popen('vncserver -list'.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = process.communicate()[0].decode()
+
+    servers = []
+    for line in output.splitlines():
+        match = re_server_entry.match(line)
+        if not match:
+            continue
+        server = {k: int(v) for k,v in match.groupdict().items()}
+        server['port'] = display_to_port(server['display'])
+        servers.append(server)
+    return servers
+
+def print_server_list(serverlist=None):
+    if serverlist is None: serverlist = get_server_list()
+    if not serverlist:
+        print('No VNC servers are currently running.')
+    else:
+        print('{:>8s}    {:>6s}    {}'.format('Display', 'Port', 'SSH port forward'))
+        for server in sorted(serverlist,key=(lambda x: x['display'])):
+            sshcmd = '-L {port:d}:localhost:{port:d}'.format(port=server['port'])
+            print('{:8d}    {:6d}    {}'.format(server['display'], server['port'], sshcmd))
+        
+def start_server():
+    '''Start a VNC server, if ``test`` is not false), and return a
+    dictionary of display information including display number and
+    port.
+
+    '''
+    
+    # Ensure that a valid session is chosen
+    if 'XSESSION' not in os.environ:
+        os.environ['XSESSION'] = 'KDE-4'
+
+    # Start server and extract display number, calculating port number
+    # (perhaps 1920x1254 resolution by default?)
+    args = 'vncserver -geometry 1024x768 -depth 24 -SecurityTypes None -localhost -autokill'.split()
+    output = subprocess.check_output(args, stderr=subprocess.STDOUT).decode()
+    display = int(re_get_display.search(output).group(1))
+    port = display_to_port(display)
+    return {'display': display,
+            'port': port}
+
+def kill_server(server):
+    '''Kill a VNC server'''
+
+    args = 'vncserver -kill :{display}'.format(**server).split()
+    subprocess.check_call(args)
+
+    
+parser = argparse.ArgumentParser(description='Start a VNC desktop and print instructions on how to connect to it.')
+mode_group = parser.add_mutually_exclusive_group()
+mode_group.add_argument('--check', action='store_true',
+                        help='''Check to see if a VNC desktop is running; start one if not.
+                        This is the default mode of operation.''')
+mode_group.add_argument('--list', action='store_true',
+                        help='''List running VNC desktops.''')
+mode_group.add_argument('--start', action='store_true',
+                        help='''Start a VNC desktop (regardless of whether one is already running).''')
+mode_group.add_argument('--kill', type=int, nargs='?', default=False, const=None, metavar='DISPLAY',
+                        help='''Kill a running VNC desktop.''')
+mode_group.add_argument('--killall', action='store_true',
+                        help='''Kill all running VNC desktops.''')
+parser.add_argument('-n', '--dry-run', action='store_true',
+                    help='''Do not actually do anything; just print what would be done''')
+parser.set_defaults(check=False, list=False, start=False, kill=False, killall=False, dry_run=False)
+args = parser.parse_args()
+
+# Based on the above mutually exclusive argument group, one and only
+# one of --check, --list, --start, --kill, --killall may be present. If
+# none is present, we assume --check
+
+# These three options should all exit
+if args.list or args.kill is not False or args.killall:
+    servers = get_server_list()
+
+    if args.list:
+        print_server_list(servers)
+    elif args.kill is not False:
+        # args.kill is None means to kill the only running server; abort if more than one is running
+        server_moriturus = None # the server about to die salutes you
+        if args.kill is None:
+            if len(servers) > 1:
+                print('Multiple servers running and server to kill not given',file=sys.stderr)
+                print('Please provide the server display number (as found in {} --list)'.format(sys.argv[0])
+                      ,file=sys.stderr)
+            
+                parser.print_help()
+                sys.exit(1)
+            elif len(servers) == 0:
+                print('No server to kill.')
+                sys.exit(0)
+            else: # len(servers) == 1
+                server_moriturus = servers[0] 
+        else:
+            # Which server do we kill?
+            servers_by_display = {server['display']: server for server in servers}
+            servers_by_port = {server['port']: server for server in servers}
+
+            try:
+                server_moriturus = servers_by_display[args.kill]
+            except KeyError as display_exp:
+                try:
+                    server_moriturus = servers_by_port[args.kill]
+                except KeyError as port_exp:
+                    print('Cannot find a server with display number or port {}.'.format(args.kill))
+                    print('Use {} --list to identify a server to kill.'.format(sys.argv[0]))
+                    sys.exit(1)
+
+        # We should have a valid server by now
+        assert server_moriturus is not None
+
+        if args.dry_run:
+            print('Would kill server :{display} (port {port}).'.format(**server_moriturus))
+        else:
+            kill_server(server_moriturus)
+            
+    elif args.killall:
+        for server in servers:
+            if args.dry_run:
+                print('Would kill server :{display} (port {port}).'.format(**server))
+            else:
+                kill_server(server)
+            
+    # Exit when done processing these options
+    sys.exit(0)
+    
+# By this point, the only options not processed are --start or --check
+# These two options need to print information after checking/starting a server
+if args.start:
+    if args.dry_run:
+        print('would start server')
+    else:
+        serverinfo = start_server()
+else: # args.check is either True or omitted; check either way
+    servers = get_server_list()
+    if len(servers) > 1:
+        print('Multiple servers running!')
+        print_server_list()
+        sys.exit(0)
+
+    if len(servers) == 0:
+        if args.dry_run:
+            print('would start server')
+        else:
+            serverinfo = start_server()
+    else: # exactly one server running
+        serverinfo = servers[0]
+
+    if args.dry_run:
+        sys.exit(0)    
+        
+    serverinfo['hostname'] = hostname
+    serverinfo['username'] = getpass.getuser()
+    
+    info = '''\
+Display :{display:d} is running on port {port:d}. To access this display, type
+
+  ~C-L {port:d}:localhost:{port:d}
+
+(tilde, then C, then type the rest) in a running SSH terminal (followed by two
+presses of the Enter key), or execute
+
+  ssh -L {port:d}:localhost:{port:d} {username}@{hostname}
+
+on your local machine (not this one). After this, point your VNC client at
+  {hostname}:{port:d}
+
+
+To shut down this display, connect using VNC and then log out using the
+start-menu-lookalike's logout option (or run checkvnc --kill {display:d}).
+'''.format(**serverinfo)
+
+    print(info)
+    
+        
+        

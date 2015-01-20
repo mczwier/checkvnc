@@ -22,7 +22,7 @@ if 'XSESSION' not in os.environ:
 
 # Run vncserver, or else use some example output for test purposes
 if not args.test:
-    output = subprocess.check_output('vncserver -geometry 1024x768 -depth 24 -SecurityTypes None -localhost'.split(),
+    output = subprocess.check_output('vncserver -geometry 1024x768 -depth 24 -SecurityTypes None -localhost -autokill'.split(),
                                      stderr=subprocess.STDOUT)
 else:
     output = '''\
@@ -77,7 +77,7 @@ your network connection. To reconnect, be sure an SSH session is
 running (including the -L flag above), then reconnect with the VNC
 viewer.
 
-To shut the display down, run
+To shut the display down, log out of the desktop session normally, or run
 
   vncserver -kill :{ndisplay:d}
 
