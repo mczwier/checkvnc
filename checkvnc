@@ -204,7 +204,7 @@ presses of the Enter key), or execute
   ssh -L {port:d}:localhost:{port:d} {username}@{hostname}
 
 on your local machine (not this one). After this, point your VNC client at
-  {hostname}:{port:d}
+  localhost:{port:d}
 
 
 To shut down this display, connect using VNC and then log out using the
