@@ -61,7 +61,7 @@ def print_server_list(serverlist=None):
             sshcmd = '-L {port:d}:localhost:{port:d}'.format(port=server['port'])
             print('{:8d}    {:6d}    {}'.format(server['display'], server['port'], sshcmd))
         
-def start_server():
+def start_server(secure=False):
     '''Start a VNC server, if ``test`` is not false), and return a
     dictionary of display information including display number and
     port.
@@ -73,8 +73,12 @@ def start_server():
         os.environ['XSESSION'] = 'KDE-4'
 
     # Start server and extract display number, calculating port number
-    # (perhaps 1920x1254 resolution by default?)
-    args = 'vncserver -geometry 1024x768 -depth 24 -SecurityTypes None -localhost -autokill'.split()
+    args = 'vncserver -geometry 1024x768 -depth 24 -localhost -autokill'.split()
+    if secure:
+        args += ['-SecurityTypes','VncAuth', '-rfbauth', os.path.expanduser('~/.vnc/passwd')]
+    else:
+        args += ['-SecurityTypes', 'None']
+        
     output = subprocess.check_output(args, stderr=subprocess.STDOUT).decode()
     display = int(re_get_display.search(output).group(1))
     port = display_to_port(display)
@@ -103,7 +107,10 @@ mode_group.add_argument('--killall', action='store_true',
                         help='''Kill all running VNC desktops.''')
 parser.add_argument('-n', '--dry-run', action='store_true',
                     help='''Do not actually do anything; just print what would be done''')
-parser.set_defaults(check=False, list=False, start=False, kill=False, killall=False, dry_run=False)
+parser.add_argument('-s', '--secure', action='store_true',
+                    help='''Require a VNC password to access the display.
+This password can be set by running 'vncpasswd'.''')
+parser.set_defaults(check=False, list=False, start=False, kill=False, killall=False, dry_run=False, secure=False)
 args = parser.parse_args()
 
 # Based on the above mutually exclusive argument group, one and only
@@ -171,7 +178,7 @@ if args.start:
     if args.dry_run:
         print('would start server')
     else:
-        serverinfo = start_server()
+        serverinfo = start_server(secure=args.secure)
 else: # args.check is either True or omitted; check either way
     servers = get_server_list()
     if len(servers) > 1:
@@ -183,7 +190,7 @@ else: # args.check is either True or omitted; check either way
         if args.dry_run:
             print('would start server')
         else:
-            serverinfo = start_server()
+            serverinfo = start_server(secure=args.secure)
     else: # exactly one server running
         serverinfo = servers[0]
 
