@@ -76,6 +76,9 @@ def start_server(secure=False):
     args = 'vncserver -geometry 1024x768 -depth 24 -localhost -autokill'.split()
     if secure:
         args += ['-SecurityTypes','VncAuth', '-rfbauth', os.path.expanduser('~/.vnc/passwd')]
+        if not os.path.exists(os.path.expanduser('~/.vnc/passwd')):
+            subprocess.check_call(['vncpasswd'])
+                              
     else:
         args += ['-SecurityTypes', 'None']
         
