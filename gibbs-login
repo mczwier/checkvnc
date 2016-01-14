@@ -21,7 +21,12 @@ use IO::Stty;
 use Expect;
 
 $hostname="gibbs.drake.edu";
-$tigervnc='/Volumes/classes/Mac_Software/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+
+if ( -d '/Volumes/classes' ) {
+    $tigervnc='/Volumes/classes/Mac_Software/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+} else {
+    $tigervnc='/Applications/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+}
 $checkvnc='/usr/local/bin/checkvnc';
 
 sub ssh_login {
