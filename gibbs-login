@@ -1,0 +1,88 @@
+#!/usr/bin/perl
+
+#     Display :3 is running on port 5903. To access this display, type
+
+#   ~C-L 5903:localhost:5903
+
+# (tilde, then C, then type the rest) in a running SSH terminal (followed by two
+# presses of the Enter key), or execute
+
+#   ssh -L 5903:localhost:5903 mzwier@gibbs.drake.edu
+
+# on your local machine (not this one). After this, point your VNC client at
+#   localhost:5903
+
+
+# To shut down this display, connect using VNC and then log out using the
+# start-menu-lookalike's logout option (or run checkvnc --kill 3).
+
+
+use IO::Stty;
+use Expect;
+
+$hostname="gibbs.drake.edu";
+$tigervnc='/Volumes/classes/Mac_Software/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+$checkvnc='/usr/local/bin/checkvnc';
+
+sub ssh_login {
+    # Log into a server using SSH. Supplies password if prompted. Waits for a '$'.
+    # Returns an expect object for the process created.
+    my %args = @_;
+
+    my $ssh_base = $args{ssh} || "ssh -o StrictHostKeyChecking=no";
+    my $username = $args{username};
+    my $password = $args{password};
+    my $hostname = $args{hostname};
+    my $ssh_args = $args{ssh_args} || [];
+
+    my $ssh_command = "$ssh_base ";
+    $ssh_command .= "$username" . "@" if $username;
+    $ssh_command .= "$hostname";
+    $ssh_command .= " " . join ' ', @$ssh_args if scalar(@$ssh_args);
+
+    #print "Executing '$ssh_command'\n";
+    
+    my $handle = Expect->spawn($ssh_command);
+
+    $handle->expect($args{timeout},
+                    [ qr/password:/i, sub { $handle->send("$password\n"); exp_continue; } ],
+                    '$');
+    return $handle;
+}
+
+$old_mode = IO::Stty::stty(\*STDIN, '-g');
+
+print "Enter your username: ";
+$username = <STDIN>; chomp $username;
+die "Username is required" if not $username;
+
+IO::Stty::stty(\*STDIN, '-echo');
+print "Enter your password: ";
+$password = <STDIN>; chomp $password;
+print "\n";
+IO::Stty::stty(\*STDIN, $old_mode);
+
+#print "Username was $username\n";
+#print "Password was $password\n";
+
+$ssh = ssh_login(hostname => $hostname,
+                 username => $username,
+                 password => $password);
+$checkvnc_command = "checkvnc ";
+$checkvnc_command .= join ' ', @ARGV if @ARGV;
+$checkvnc_command .= "\n";
+
+$ssh->send($checkvnc_command);
+$ssh->expect(undef,'-re', '~C(-L\s+\d+:localhost:\d+)');
+$fwd_string = ($ssh->matchlist())[0];
+
+#print "Forward string is $fwd_string\n";
+$connect_string = ($fwd_string =~ /-L\s+\d+:(localhost:\d+)/ && $1);
+#print "Connect string is $1\n";
+
+$ssh->send('~C');
+$ssh->expect(undef, 'ssh>');
+$ssh->send("$fwd_string\n\n");
+$ssh->expect(undef,'$');
+system("$tigervnc $connect_string");
+$ssh->send("logout\n");
