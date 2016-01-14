@@ -40,7 +40,7 @@ sub ssh_login {
     $ssh_command .= "$hostname";
     $ssh_command .= " " . join ' ', @$ssh_args if scalar(@$ssh_args);
 
-    #print "Executing '$ssh_command'\n";
+    print "Executing '$ssh_command'\n";
     
     my $handle = Expect->spawn($ssh_command);
 
@@ -54,7 +54,7 @@ $old_mode = IO::Stty::stty(\*STDIN, '-g');
 
 print "Enter your username: ";
 $username = <STDIN>; chomp $username;
-die "Username is required" if not $username;
+#die "Username is required" if not $username;
 
 IO::Stty::stty(\*STDIN, '-echo');
 print "Enter your password: ";
