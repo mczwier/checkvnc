@@ -9,6 +9,8 @@ baseport = 5900
 # The current hostname, patched to be fully-qualified
 hostname = socket.gethostname()
 if '.' not in hostname: hostname += '.drake.edu'
+short_hostname = hostname.split('.')[0]
+
 
 # The default X session
 default_session = 'KDE-4'
@@ -73,7 +75,7 @@ def start_server(secure=False):
         os.environ['XSESSION'] = 'KDE-4'
 
     # Start server and extract display number, calculating port number
-    args = 'vncserver -geometry 1024x768 -depth 24 -localhost -autokill'.split()
+    args = 'vncserver -geometry 1024x768 -depth 24 -autokill'.split()
     if secure:
         args += ['-SecurityTypes','VncAuth', '-rfbauth', os.path.expanduser('~/.vnc/passwd')]
         if not os.path.exists(os.path.expanduser('~/.vnc/passwd')):
@@ -201,6 +203,7 @@ else: # args.check is either True or omitted; check either way
         sys.exit(0)    
         
     serverinfo['hostname'] = hostname
+    serverinfo['short_hostname'] = short_hostname
     serverinfo['username'] = getpass.getuser()
     
     info = '''\
@@ -216,6 +219,8 @@ presses of the Enter key), or execute
 on your local machine (not this one). After this, point your VNC client at
   localhost:{port:d}
 
+From the research lab computers, you may simply execute
+  vncviewer {short_hostname}:{display:d}
 
 To shut down this display, connect using VNC and then log out using the
 start-menu-lookalike's logout option (or run checkvnc --kill {display:d}).
