@@ -25,7 +25,11 @@ $hostname="gibbs.drake.edu";
 if ( -d '/Volumes/classes' ) {
     $tigervnc='/Volumes/classes/Mac_Software/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
 } else {
-    $tigervnc='/Applications/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+    if ( -d '/Applications/TigerVNC\ Viewer\ 1.7.0.app/Contents/MacOS/TigerVNC\ Viewer') {
+        $tigervnc='/Applications/TigerVNC\ Viewer\ 1.7.0.app/Contents/MacOS/TigerVNC\ Viewer';
+    } else {
+        $tigervnc='/Applications/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+    }
 }
 $checkvnc='/usr/local/bin/checkvnc';
 
