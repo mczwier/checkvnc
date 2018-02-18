@@ -23,14 +23,16 @@ use Expect;
 $hostname="gibbs.drake.edu";
 
 if ( -d '/Volumes/classes' ) {
-    $tigervnc='/Volumes/classes/Mac_Software/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
+    $basedir = '/Volumes/classes';
 } else {
-    if ( -d '/Applications/TigerVNC\ Viewer\ 1.7.0.app/Contents/MacOS/TigerVNC\ Viewer') {
-        $tigervnc='/Applications/TigerVNC\ Viewer\ 1.7.0.app/Contents/MacOS/TigerVNC\ Viewer';
-    } else {
-        $tigervnc='/Applications/TigerVNC\ Viewer\ 1.6.0.app/Contents/MacOS/TigerVNC\ Viewer';
-    }
+    $basedir = '/Applications';
 }
+@vncs = sort glob "$basedir/TigerVNC*.app";
+$tigervnc = $vncs[-1] . '/Contents/MacOS/TigerVNC Viewer';
+$tigervnc =~ s/ /\\ /g;
+
+print "Using VNC from $tigervnc\n";
+
 $checkvnc='/usr/local/bin/checkvnc';
 
 sub ssh_login {
