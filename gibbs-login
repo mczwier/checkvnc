@@ -40,7 +40,7 @@ sub ssh_login {
     # Returns an expect object for the process created.
     my %args = @_;
 
-    my $ssh_base = $args{ssh} || "ssh -o StrictHostKeyChecking=no";
+    my $ssh_base = $args{ssh} || "ssh -t -o StrictHostKeyChecking=no";
     my $username = $args{username};
     my $password = $args{password};
     my $hostname = $args{hostname};
@@ -50,9 +50,10 @@ sub ssh_login {
     $ssh_command .= "$username" . "@" if $username;
     $ssh_command .= "$hostname";
     $ssh_command .= " " . join ' ', @$ssh_args if scalar(@$ssh_args);
+    $ssh_command .= " bash -l";
 
     print "Executing '$ssh_command'\n";
-    
+
     my $handle = Expect->spawn($ssh_command);
 
     $handle->expect($args{timeout},
